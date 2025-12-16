@@ -1,0 +1,58 @@
+# -----------------------------
+# PYTHON
+# -----------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Byte-compiled / optimized / DLL files
+*.egg-info/
+.eggs/
+dist/
+build/
+
+.ipynb_checkpoints/
+*.ipynb_checkpoints/
+
+*.nbconvert.ipynb
+
+*.bin
+*.pt
+*.ckpt
+*.h5
+*.pb
+*.tflite
+
+data/models/
+nlp_tutor/**/checkpoints/
+nlp_tutor/**/runs/
+
+*.spacy
+training/
+metrics.json
+
+
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+*.csv
+*.tsv
+*.jsonl
+
+.env
+*.log
+
+.DS_Store
+Thumbs.db
+
+.idea/
+
