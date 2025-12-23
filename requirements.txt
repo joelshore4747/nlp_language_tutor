@@ -1,8 +1,10 @@
+
 nltk
 spacy
 scikit-learn
 torch
 transformers
+sentencepiece
 pandas
 numpy
 joblib

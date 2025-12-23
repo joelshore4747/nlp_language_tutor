@@ -89,16 +89,31 @@ def load_imdb_kaggle() -> TextLabelDataset:
 # ---------------------------------------------------------------------------
 # Kaggle: language detection dataset (for later lessons)
 # ---------------------------------------------------------------------------
-
 def load_language_detection_kaggle() -> TextLabelDataset:
-    path = PATHS.raw_dir / "lang_detect" / "Language Detection.csv"
-    if not path.exists():
-        raise FileNotFoundError(f"Language detection dataset not found at {path}")
+    import glob
 
+    # Find any csv under data/raw/lang_detect/
+    folder = (PATHS.raw_dir / "lang_detect")
+    candidates = sorted(glob.glob(str(folder / "*.csv")))
+    if not candidates:
+        raise FileNotFoundError(f"No CSV found in {folder}. Put the dataset there.")
+
+    path = Path(candidates[0])  # take the first match
     df = pd.read_csv(path)
-    texts = df["Text"].astype(str).tolist()
-    labels = df["Language"].astype(str).tolist()
-    return TextLabelDataset(texts=texts, labels=labels)
 
+    # Normalise common column variants
+    cols = {c.lower().strip(): c for c in df.columns}
+    text_col = cols.get("text") or cols.get("sentence") or cols.get("content")
+    lang_col = cols.get("language") or cols.get("label") or cols.get("lang")
+
+    if text_col is None or lang_col is None:
+        raise ValueError(
+            f"Language detection CSV must contain Text + Language columns. "
+            f"Found columns: {list(df.columns)}"
+        )
+
+    texts = df[text_col].astype(str).tolist()
+    labels = df[lang_col].astype(str).tolist()
+    return TextLabelDataset(texts=texts, labels=labels)
 
 
