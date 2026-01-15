@@ -43,9 +43,7 @@ class NgramLanguageModel:
 
 
     def _cond_prob(self, context: tuple, token: str) -> float:
-        """
-        P(token | context) with add-k smoothing.
-        """
+
         if not self.trained:
             raise RuntimeError("Model not trained. Call fit() first.")
 
@@ -57,14 +55,12 @@ class NgramLanguageModel:
         return num / den
 
     def sentence_log_prob(self, tokens: List[str]) -> float:
-        """
-        Log-probability (natural log) of a sentence, including end token.
-        """
+
         if not self.trained:
             raise RuntimeError("Model not trained. Call fit() first.")
 
         order = self.order
-        # apply same boundary handling as in training
+
         seq = ["<s>"] * (order - 1) + tokens + ["</s>"]
 
         log_p = 0.0
@@ -76,9 +72,7 @@ class NgramLanguageModel:
         return log_p
 
     def perplexity(self, tokens: List[str]) -> float:
-        """
-        Perplexity for a single sentence (lower = more fluent under this LM).
-        """
+
         if not tokens:
             return float("inf")
         log_p = self.sentence_log_prob(tokens)

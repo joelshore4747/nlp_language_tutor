@@ -21,36 +21,26 @@ class SimilarityResult:
 
 
 class SemanticScorer:
-    """
-    Semantic similarity scorer supporting:
-      - TF-IDF (classic IR baseline)
-      - SBERT multilingual sentence embeddings (modern neural semantics)
-
-    Design:
-      - fit(reference_texts) once, then:
-          * score_pair(learner, target)
-          * nearest(learner, k)
-    """
 
     def __init__(self, backend: Backend = "tfidf") -> None:
         self.backend: Backend = backend
 
-        # TF-IDF
+
         self._tfidf: Optional[TfidfVectorizer] = None
         self._ref_tfidf = None
 
-        # SBERT
+
         self._sbert_model = None
         self._ref_emb = None
 
-        # shared
+
         self._ref_texts: Optional[List[str]] = None
 
     def fit(self, reference_texts: List[str], lang: Lang) -> None:
         if not reference_texts:
             raise ValueError("reference_texts is empty")
 
-        # light normalisation only; do not over-normalise semantics
+
         refs = [prep.normalise(t) for t in reference_texts]
         self._ref_texts = refs
 

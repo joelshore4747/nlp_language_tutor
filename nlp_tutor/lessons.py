@@ -63,12 +63,6 @@ def index_lesson_bank(items: List[LessonItem]) -> Dict[Tuple[int, int], LessonIt
 
 
 class LessonSemanticEngine:
-    """
-    Holds fitted semantic scorers over *all targets* so we can:
-      - score learner answer vs target
-      - retrieve nearest targets (helpful for feedback / grading)
-    """
-
     def __init__(self, items: List[LessonItem]) -> None:
         self.items = items
         self.targets_by_lang: Dict[Lang, List[str]] = {

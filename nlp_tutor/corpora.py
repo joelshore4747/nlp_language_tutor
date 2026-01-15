@@ -23,10 +23,6 @@ class TextLabelDataset:
     labels: List[str]
 
 
-# ---------------------------------------------------------------------------
-# NLTK corpora: for language models & a small sentiment baseline
-# ---------------------------------------------------------------------------
-
 def ensure_nltk_corpora() -> None:
     nltk.download("brown", quiet=True)
     nltk.download("cess_esp", quiet=True)
@@ -107,10 +103,6 @@ def load_movie_reviews_nltk() -> TextLabelDataset:
     return TextLabelDataset(texts=texts, labels=labels)
 
 
-# ---------------------------------------------------------------------------
-# Kaggle: IMDB sentiment dataset
-# ---------------------------------------------------------------------------
-
 def load_imdb_kaggle() -> TextLabelDataset:
     path = PATHS.raw_dir / "imdb" / "IMDB Dataset.csv"
     if not path.exists():
@@ -122,22 +114,20 @@ def load_imdb_kaggle() -> TextLabelDataset:
     return TextLabelDataset(texts=texts, labels=labels)
 
 
-# ---------------------------------------------------------------------------
-# Kaggle: language detection dataset (for later lessons)
-# ---------------------------------------------------------------------------
+
 def load_language_detection_kaggle() -> TextLabelDataset:
     import glob
 
-    # Find any csv under data/raw/lang_detect/
+
     folder = (PATHS.raw_dir / "lang_detect")
     candidates = sorted(glob.glob(str(folder / "*.csv")))
     if not candidates:
         raise FileNotFoundError(f"No CSV found in {folder}. Put the dataset there.")
 
-    path = Path(candidates[0])  # take the first match
+    path = Path(candidates[0])
     df = pd.read_csv(path)
 
-    # Normalise common column variants
+
     cols = {c.lower().strip(): c for c in df.columns}
     text_col = cols.get("text") or cols.get("sentence") or cols.get("content")
     lang_col = cols.get("language") or cols.get("label") or cols.get("lang")

@@ -9,11 +9,7 @@ from transformers import AutoModel, AutoTokenizer
 
 
 def _mean_pool(last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
-    """
-    Mean pooling over tokens with attention mask.
-    last_hidden_state: (B, T, H)
-    attention_mask:    (B, T)
-    """
+
     mask = attention_mask.unsqueeze(-1).type_as(last_hidden_state)  # (B, T, 1)
     summed = (last_hidden_state * mask).sum(dim=1)                  # (B, H)
     counts = mask.sum(dim=1).clamp(min=1e-9)                        # (B, 1)
@@ -38,13 +34,7 @@ class EmbedderConfig:
 
 
 class TransformerEmbedder:
-    """
-    Lightweight sentence embedding using a multilingual Transformer.
 
-    NOTE:
-    - We use mean pooling over token embeddings.
-    - We L2-normalize embeddings so cosine similarity behaves well.
-    """
 
     def __init__(self, cfg: EmbedderConfig = EmbedderConfig()) -> None:
         self.cfg = cfg

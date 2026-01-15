@@ -34,10 +34,9 @@ def load_wili_2018(split: str = "train") -> TextLabelDataset:
     texts = _read_lines(x_path)
     y_ids = _read_lines(y_path)
 
-    # Build id -> label mapping
+
     df = pd.read_csv(labels_path, dtype=str)
 
-    # If it parsed as a single column, it's almost certainly semicolon-delimited.
     if len(df.columns) < 2:
         df = pd.read_csv(labels_path, sep=";", dtype=str, engine="python")
 
@@ -46,8 +45,6 @@ def load_wili_2018(split: str = "train") -> TextLabelDataset:
             f"labels.csv should have >=2 columns. Found: {list(df.columns)}"
         )
 
-    # WiLI labels.csv columns typically include: "Label", "English", ...
-    # Use "Label" -> "English" if available; otherwise fallback to first two columns.
     if "Label" in df.columns and "English" in df.columns:
         id_col, name_col = "Label", "English"
     else:

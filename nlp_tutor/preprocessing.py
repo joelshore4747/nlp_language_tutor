@@ -23,10 +23,6 @@ _lemmatizer = WordNetLemmatizer()
 _word_pattern = re.compile(r"\w+")
 
 
-# ---------------------------------------------------------------------------
-# Preprocessing
-# ---------------------------------------------------------------------------
-
 def normalise(text: str) -> str:
     text = text.strip()
     text = re.sub(r"\s+", " ", text)
@@ -34,23 +30,12 @@ def normalise(text: str) -> str:
 
 
 def sentence_segment(text: str, lang: Lang = Lang.EN) -> List[str]:
-    """
-    Sentence segmentation.
 
-    NLTK's Punkt models are strongest in English, but are usable for Spanish.
-    If you later want better Spanish segmentation, we can swap to spaCy for ES.
-    """
     return sent_tokenize(text)
 
 
 def tokenize(text: str, lang: Lang = Lang.EN, lemmatize: bool = True) -> List[str]:
-    """
-    Tokenise text; lemmatize for English (WordNet), skip for Spanish for now.
 
-    Why skip ES lemmatization?
-    - NLTK WordNet lemmatizer is English-focused.
-    - We keep tokenisation consistent and document this limitation.
-    """
     tokens = word_tokenize(text)
 
     if not lemmatize:
@@ -59,14 +44,12 @@ def tokenize(text: str, lang: Lang = Lang.EN, lemmatize: bool = True) -> List[st
     lemmas: List[str] = []
     for tok in tokens:
         if not _word_pattern.fullmatch(tok):
-            # keep punctuation etc. as-is
             lemmas.append(tok)
             continue
 
         if lang == Lang.EN:
             lemmas.append(_lemmatizer.lemmatize(tok))
         else:
-            # For ES (and other languages), keep token unchanged for now
             lemmas.append(tok)
 
     return lemmas
@@ -77,9 +60,6 @@ def tokenize_sentences(text: str, lang: Lang = Lang.EN, lemmatize: bool = True) 
     return [tokenize(s, lang=lang, lemmatize=lemmatize) for s in sents]
 
 
-# ---------------------------------------------------------------------------
-# Statistics
-# ---------------------------------------------------------------------------
 
 @dataclass
 class TextStats:

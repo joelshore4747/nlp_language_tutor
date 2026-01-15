@@ -37,7 +37,6 @@ class AnalysisResult:
     action_severity: str
 
 class TutorPipeline:
-    """Single entry point for all NLP analysis."""
     
     def __init__(
         self,
@@ -112,16 +111,16 @@ class TutorPipeline:
         else:
             syntax_issues = []
 
-        # 3) Semantics
+
         scores = self.semantic_engine.score_answer(text, target_text, lang=expected_enum)
         nearest = self.semantic_engine.nearest_targets(text, lang=expected_enum, k=5)
         
-        # Transformer score if present
+
         transformer_score = None
         if hasattr(self.semantic_engine, "score_transformer"):
             transformer_score = float(self.semantic_engine.score_transformer(text, target_text, lang=expected_enum))
             scores["transformer_cosine"] = SimilarityResult(
-                backend="sbert",  # or "transformer_cosine" if we want to be specific
+                backend="sbert",
                 score=transformer_score,
                 interpretation=self.semantic_engine.interpret_similarity(transformer_score)
             )
@@ -135,11 +134,11 @@ class TutorPipeline:
             except Exception:
                 pass
 
-        # Fallback to SBERT if transformer_score is still None
+
         if transformer_score is None and "sbert" in scores:
             transformer_score = scores["sbert"].score
 
-        # 4) NER (only if language matches)
+
         ner_lang = None
         if detected == expected_enum.name:
             ner_lang = expected_enum

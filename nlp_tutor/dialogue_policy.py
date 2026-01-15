@@ -10,7 +10,7 @@ from nlp_tutor.languages import Lang
 class TutorAction:
     code: str
     message: str
-    severity: str  # "info" | "warn" | "block"
+    severity: str
 
 
 def choose_action(
@@ -22,7 +22,7 @@ def choose_action(
     semantic_score: float | None,
     fluency_band: str | None,
 ):
-    # 1) Language gate
+
     if detected_lang != expected_lang:
         return TutorAction(
             code="LANGUAGE_MISMATCH",
@@ -37,7 +37,6 @@ def choose_action(
             severity="warn",
         )
 
-    # 2) Syntax gate (only if same language)
     if syntax_issues:
         return TutorAction(
             code="SYNTAX_FIX",
@@ -45,7 +44,6 @@ def choose_action(
             severity="warn",
         )
 
-    # 3) Meaning gate
     if semantic_score is None:
         return TutorAction(
             code="NO_SEMANTICS",
@@ -53,7 +51,6 @@ def choose_action(
             severity="info",
         )
 
-    # These thresholds are reasonable starting points
     if semantic_score < 0.80:
         return TutorAction(
             code="MEANING_MISMATCH",
@@ -61,7 +58,6 @@ def choose_action(
             severity="warn",
         )
 
-    # 4) Fluency only after meaning is acceptable
     if fluency_band == "low":
         return TutorAction(
             code="FLUENCY_NUDGE",

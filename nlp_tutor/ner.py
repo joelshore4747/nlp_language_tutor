@@ -45,7 +45,6 @@ def extract_ner(lang: Lang, text: str) -> NerResult:
             explanation=spacy.explain(e.label_),
         ))
 
-    # noun_chunks is available for English; Spanish support depends on pipeline.
     noun_phrases: List[str] = []
     try:
         noun_phrases = list(dict.fromkeys([nc.text for nc in doc.noun_chunks]))

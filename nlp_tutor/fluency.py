@@ -99,12 +99,7 @@ class FluencyScorer:
         *,
         calibrate: bool = True,
     ) -> None:
-        """
-        Testing hook: train a language model from already-tokenized sentences
-        (no NLTK corpora required).
 
-        The caller can pass in a small toy corpus.
-        """
         sents = [
             _clean_tokens(
                 s,
@@ -123,21 +118,16 @@ class FluencyScorer:
         if calibrate:
             self.thresholds[lang] = self._calibrate_thresholds(lm, sents)
 
-    # -------------------------
-    # Core behaviour
-    # -------------------------
-
     def train_if_needed(self, lang: Lang) -> None:
         if lang in self.models:
             return
 
         raw_corpus = load_lm_corpus(lang)  # List[List[str]] from NLTK sources
         if not raw_corpus:
-            # No corpus -> cannot train; keep "unknown" behaviour
+
             self.thresholds[lang] = (150.0, 300.0)
             return
 
-        # Route C: re-tokenize corpus using the same pipeline as scoring.
         train_sents: List[List[str]] = []
         for toks in raw_corpus:
             if not toks:
@@ -162,7 +152,6 @@ class FluencyScorer:
         lm.fit(train_sents)
         self.models[lang] = lm
 
-        # Prefer calibrating bands using your tutor lesson bank (in-domain).
         lesson_calib = self._lesson_calibration_sents(lang)
         if len(lesson_calib) >= self.min_lesson_calib_sents:
             calib_sents = lesson_calib
@@ -187,7 +176,6 @@ class FluencyScorer:
     def score_text(self, text: str, lang: Lang) -> FluencyScore:
         self.train_if_needed(lang)
 
-        # If we still have no model (e.g. empty corpus), degrade gracefully
         if lang not in self.models:
             return FluencyScore(perplexity=float("nan"), band="unknown")
 
@@ -221,22 +209,15 @@ class FluencyScorer:
 
         return FluencyScore(perplexity=ppl, band=band)
 
-    # -------------------------
-    # Calibration internals
-    # -------------------------
-
     def _calibrate_thresholds(
         self,
         lm: NgramLanguageModel,
         sents: List[List[str]],
     ) -> Tuple[float, float]:
-        """
-        Compute (high, medium) perplexity thresholds using quantiles over perplexities.
-        """
+
         if not sents:
             return (150.0, 300.0)
 
-        # Sample for speed
         k = min(self.calibrate_samples, len(sents))
         sample = random.sample(sents, k=k) if len(sents) > k else sents
 
@@ -244,7 +225,7 @@ class FluencyScorer:
         for toks in sample:
             if not toks:
                 continue
-            # Require at least order tokens to make perplexity more stable
+
             if len(toks) < self.config.order:
                 continue
             try:
@@ -270,13 +251,6 @@ class FluencyScorer:
         return (high, medium)
 
     def _lesson_calibration_sents(self, lang: Lang) -> List[List[str]]:
-        """
-        Pull in-domain calibration sentences from your lesson bank.
-
-        ES: item.target_es
-        EN: item.target_en (fallback to prompt_en)
-        PL: item.target_pl
-        """
         try:
             from .lessons import load_lesson_bank
         except Exception:

@@ -16,7 +16,7 @@ _word_re = re.compile(r"[A-Za-z']+")
 
 
 def basic_tokenize(text: str) -> List[str]:
-    # simple and stable for IMDB
+
     text = prep.normalise(text)
     return _word_re.findall(text)
 
@@ -48,11 +48,7 @@ class Vocab:
 
 
 def pad_batch(seqs: List[List[int]], pad_idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Returns:
-      x: [B, T] padded
-      lengths: [B] original lengths
-    """
+
     lengths = torch.tensor([len(s) for s in seqs], dtype=torch.long)
     max_len = int(lengths.max().item()) if len(seqs) else 0
     x = torch.full((len(seqs), max_len), pad_idx, dtype=torch.long)

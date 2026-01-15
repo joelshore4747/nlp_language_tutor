@@ -32,7 +32,7 @@ class SyntaxReport:
     lang: Lang
     features: SyntaxFeatures
     issues: List[SyntaxIssue]
-    debug: Dict[str, Any]  # optional extra info for notebook/report
+    debug: Dict[str, Any]
 
 
 def analyse_syntax(text: str, lang: Lang) -> SyntaxReport:

@@ -26,18 +26,16 @@ class Lang(str, Enum):
         if not s:
             raise ValueError("Language is required")
 
-        # 1) Try enum NAME (EN/ES/PL/RU)
+
         u = s.upper()
         if u in Lang.__members__:
             return Lang[u]
 
-        # 2) Try enum VALUE ("en","es","pl","ru")
         l = s.lower()
         for lang in Lang:
             if l == lang.value:
                 return lang
 
-        # 3) Try display name ("English","Spanish",...)
         l2 = s.lower()
         for lang in Lang:
             if l2 == lang.display_name.lower():
