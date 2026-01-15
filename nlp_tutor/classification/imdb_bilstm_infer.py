@@ -6,19 +6,21 @@ from pathlib import Path
 import joblib
 import torch
 
-from ..config import PATHS
+from ..config import resolve_model_path
 from .sequence_data import basic_tokenize, Vocab, pad_batch
 from .bilstm_model import BiLSTMSentiment
 
 
-MODEL_PATH = PATHS.models_dir / "sentiment_bilstm.pt"
-VOCAB_PATH = PATHS.models_dir / "sentiment_bilstm_vocab.joblib"
+MODEL_NAME = "sentiment_bilstm.pt"
+VOCAB_NAME = "sentiment_bilstm_vocab.joblib"
 
 
 def load_bilstm(device: str = "cpu"):
-    vocab: Vocab = joblib.load(VOCAB_PATH)
+    vocab_path = resolve_model_path(VOCAB_NAME)
+    model_path = resolve_model_path(MODEL_NAME)
+    vocab: Vocab = joblib.load(vocab_path)
     model = BiLSTMSentiment(vocab_size=len(vocab.itos), pad_idx=vocab.pad_idx)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
+    model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
     model.eval()
     return model, vocab

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import List, Tuple
 
@@ -10,7 +11,7 @@ import pandas as pd
 from nltk.corpus import brown, cess_esp, movie_reviews
 from sklearn.model_selection import train_test_split
 
-from .config import PATHS
+from .config import PATHS, RESOURCE_LM_DIR
 from .languages import Lang
 from . import preprocessing as prep
 
@@ -31,23 +32,58 @@ def ensure_nltk_corpora() -> None:
     nltk.download("cess_esp", quiet=True)
     nltk.download("movie_reviews", quiet=True)
 
+def _lm_env_var(lang: Lang) -> str:
+    return f"NLP_TUTOR_LM_{lang.name}"
 
-def load_lm_corpus(lang: Lang) -> List[List[str]]:
-    ensure_nltk_corpora()
+
+def _load_local_lm_corpus(lang: Lang) -> List[List[str]]:
+    env_path = os.environ.get(_lm_env_var(lang))
+    if env_path:
+        path = Path(env_path)
+    else:
+        path = RESOURCE_LM_DIR / f"{lang.value}.txt"
+
+    if not path.exists():
+        return []
+
     prep.ensure_nltk_resources()
 
+    tokenised: List[List[str]] = []
+    lines = path.read_text(encoding="utf-8", errors="ignore").splitlines()
+    for line in lines:
+        text = line.strip()
+        if not text:
+            continue
+        norm = prep.normalise(text)
+        toks = prep.tokenize(norm, lang=lang, lemmatize=True)
+        if toks:
+            tokenised.append(toks)
+    return tokenised
+
+
+def load_lm_corpus(lang: Lang) -> List[List[str]]:
+    local = _load_local_lm_corpus(lang)
+    if local:
+        return local
+
     if lang == Lang.EN:
+        ensure_nltk_corpora()
+        prep.ensure_nltk_resources()
         sents = brown.sents()
     elif lang == Lang.ES:
+        ensure_nltk_corpora()
+        prep.ensure_nltk_resources()
         sents = cess_esp.sents()
+    elif lang == Lang.PL:
+        return []
     else:
-        raise ValueError(f"Unsupported language for LM: {lang}")
+        return []
 
     tokenised: List[List[str]] = []
     for sent in sents:
         raw = " ".join(sent)
         norm = prep.normalise(raw)
-        toks = prep.tokenize(norm, lang=lang, lemmatise=True)
+        toks = prep.tokenize(norm, lang=lang, lemmatize=True)
         if toks:
             tokenised.append(toks)
 
@@ -115,5 +151,4 @@ def load_language_detection_kaggle() -> TextLabelDataset:
     texts = df[text_col].astype(str).tolist()
     labels = df[lang_col].astype(str).tolist()
     return TextLabelDataset(texts=texts, labels=labels)
-
 

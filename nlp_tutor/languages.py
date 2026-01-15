@@ -1,8 +1,5 @@
-# nlp_tutor/languages.py
 from __future__ import annotations
-
 from enum import Enum
-
 
 class Lang(str, Enum):
     EN = "en"
@@ -18,3 +15,32 @@ class Lang(str, Enum):
             Lang.PL: "Polish",
             Lang.RU: "Russian",
         }[self]
+
+    @staticmethod
+    def parse(value: str) -> "Lang":
+
+        if value is None:
+            raise ValueError("Language is required")
+
+        s = value.strip()
+        if not s:
+            raise ValueError("Language is required")
+
+        # 1) Try enum NAME (EN/ES/PL/RU)
+        u = s.upper()
+        if u in Lang.__members__:
+            return Lang[u]
+
+        # 2) Try enum VALUE ("en","es","pl","ru")
+        l = s.lower()
+        for lang in Lang:
+            if l == lang.value:
+                return lang
+
+        # 3) Try display name ("English","Spanish",...)
+        l2 = s.lower()
+        for lang in Lang:
+            if l2 == lang.display_name.lower():
+                return lang
+
+        raise ValueError(f"Unsupported language: {value!r}")

@@ -16,17 +16,12 @@ from sklearn.model_selection import train_test_split
 from torch.utils.data import DataLoader, Dataset
 
 from nlp_tutor import preprocessing as prep
-from nlp_tutor.config import PATHS
+from nlp_tutor.config import PATHS, resolve_model_path
 from nlp_tutor.corpora import TextLabelDataset
 
 
 MODEL_NAME = "lang_detect_char_bilstm.pt"
 META_NAME = "lang_detect_char_bilstm_meta.json"
-
-
-# ----------------------------
-# Utilities
-# ----------------------------
 
 def set_seed(seed: int = 42) -> None:
     random.seed(seed)
@@ -36,13 +31,11 @@ def set_seed(seed: int = 42) -> None:
 
 
 def strip_diacritics(s: str) -> str:
-    # Useful to test robustness when users omit accents (e.g., "dzien dobry")
     nfkd = unicodedata.normalize("NFKD", s)
     return "".join(ch for ch in nfkd if not unicodedata.combining(ch))
 
 
 def add_typo_noise(s: str, p: float = 0.08) -> str:
-    # Very light noise: randomly drop a char with small probability
     if len(s) < 5:
         return s
     out = []
@@ -53,18 +46,12 @@ def add_typo_noise(s: str, p: float = 0.08) -> str:
     return "".join(out) if out else s
 
 
-# ----------------------------
-# Vocab + Encoding
-# ----------------------------
-
 def build_char_vocab(texts: List[str], min_freq: int = 1) -> Dict[str, int]:
     freq: Dict[str, int] = {}
     for t in texts:
         for ch in t:
             freq[ch] = freq.get(ch, 0) + 1
 
-    # reserve:
-    # 0 = PAD, 1 = UNK
     char2idx = {"<PAD>": 0, "<UNK>": 1}
 
     for ch, f in sorted(freq.items(), key=lambda x: (-x[1], x[0])):
@@ -90,11 +77,6 @@ def pad_batch(seqs: List[List[int]], pad_id: int = 0) -> Tuple[torch.Tensor, tor
     for i, s in enumerate(seqs):
         x[i, :len(s)] = torch.tensor(s, dtype=torch.long)
     return x, lengths
-
-
-# ----------------------------
-# Dataset
-# ----------------------------
 
 class CharLangDataset(Dataset):
     def __init__(
@@ -126,10 +108,6 @@ def collate_fn(batch: List[Tuple[List[int], int]]) -> Tuple[torch.Tensor, torch.
     return x, lengths, y
 
 
-# ----------------------------
-# Model
-# ----------------------------
-
 class CharBiLSTM(nn.Module):
     def __init__(
         self,
@@ -152,17 +130,13 @@ class CharBiLSTM(nn.Module):
         self.fc = nn.Linear(hidden_dim * 2, n_classes)
 
     def forward(self, x: torch.Tensor, lengths: torch.Tensor) -> torch.Tensor:
-        # x: (B, T)
-        e = self.emb(x)  # (B, T, E)
+        e = self.emb(x)
 
-        # pack for efficiency
         packed = nn.utils.rnn.pack_padded_sequence(
             e, lengths.cpu(), batch_first=True, enforce_sorted=False
         )
         packed_out, (h_n, c_n) = self.lstm(packed)
 
-        # h_n: (num_layers*2, B, H)
-        # take last layer forward + backward
         h_fwd = h_n[-2]  # (B, H)
         h_bwd = h_n[-1]  # (B, H)
         h = torch.cat([h_fwd, h_bwd], dim=1)  # (B, 2H)
@@ -171,10 +145,6 @@ class CharBiLSTM(nn.Module):
         logits = self.fc(h)  # (B, C)
         return logits
 
-
-# ----------------------------
-# Train/Eval
-# ----------------------------
 
 @dataclass(frozen=True)
 class TrainResult:
@@ -256,7 +226,6 @@ def train_eval_save(
 
     ds = _filter_ds(ds, target_langs)
 
-    # Preprocess (lowercase/space normalisation)
     texts = [prep.normalise(t) for t in ds.texts]
     labels_str = [str(y) for y in ds.labels]
 
@@ -275,7 +244,6 @@ def train_eval_save(
         stratify=y_all,
     )
 
-    # char vocab from training set only (good practice)
     char2idx = build_char_vocab(X_train, min_freq=1)
 
     train_ds = CharLangDataset(X_train, y_train, char2idx, max_chars=max_chars)
@@ -354,7 +322,6 @@ def train_eval_save(
         "config": best_state["config"],
     }, indent=2), encoding="utf-8")
 
-    # Reload best state for final report metrics
     model.load_state_dict(best_state["state_dict"])
     acc, f1m, cm, rep = evaluate_model(model, test_loader, device, idx2label)
 
@@ -369,8 +336,9 @@ def train_eval_save(
 
 def load_model(save_dir: Path | None = None) -> Dict:
     if save_dir is None:
-        save_dir = PATHS.models_dir
-    path = save_dir / MODEL_NAME
+        path = resolve_model_path(MODEL_NAME)
+    else:
+        path = save_dir / MODEL_NAME
     if not path.exists():
         raise FileNotFoundError(f"BiLSTM model not found at {path}. Train it first.")
     return torch.load(path, map_location="cpu")
@@ -380,26 +348,32 @@ def predict_language(
     text: str,
     top_k: int = 3,
     save_dir: Path | None = None,
+    model: Optional[CharBiLSTM] = None,
+    char2idx: Optional[Dict[str, int]] = None,
+    idx2label: Optional[List[str]] = None,
+    config: Optional[Dict] = None,
 ) -> Dict:
-    pack = load_model(save_dir=save_dir)
+    if model is None or char2idx is None or idx2label is None or config is None:
+        pack = load_model(save_dir=save_dir)
+        char2idx = pack["char2idx"]
+        idx2label = pack["idx2label"]
+        config = pack["config"]
 
-    char2idx = pack["char2idx"]
-    idx2label = pack["idx2label"]
-    cfg = pack["config"]
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model = CharBiLSTM(
+            vocab_size=len(char2idx),
+            n_classes=len(idx2label),
+            emb_dim=config["emb_dim"],
+            hidden_dim=config["hidden_dim"],
+            dropout=config["dropout"],
+        ).to(device)
+        model.load_state_dict(pack["state_dict"])
+        model.eval()
 
-    model = CharBiLSTM(
-        vocab_size=len(char2idx),
-        n_classes=len(idx2label),
-        emb_dim=cfg["emb_dim"],
-        hidden_dim=cfg["hidden_dim"],
-        dropout=cfg["dropout"],
-    ).to(device)
-    model.load_state_dict(pack["state_dict"])
-    model.eval()
+    device = next(model.parameters()).device
 
-    x_ids = encode_text(prep.normalise(text), char2idx, max_chars=cfg["max_chars"])
+    x_ids = encode_text(prep.normalise(text), char2idx, max_chars=config["max_chars"])
     x, lengths = pad_batch([x_ids], pad_id=0)
     x = x.to(device)
     lengths = lengths.to(device)

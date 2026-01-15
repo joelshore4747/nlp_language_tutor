@@ -7,6 +7,7 @@ import spacy
 from spacy.language import Language
 
 from nlp_tutor.languages import Lang
+from nlp_tutor.spacy_loader import load_nlp as get_nlp
 
 
 @dataclass(frozen=True)
@@ -24,24 +25,13 @@ class NerResult:
     noun_phrases: List[str]
 
 
-_SPACY_CACHE: dict[Lang, Language] = {}
-
-
-def _model_name(lang: Lang) -> str:
-    if lang == Lang.EN:
-        return "en_core_web_sm"
-    if lang == Lang.ES:
-        return "es_core_news_sm"
-    raise ValueError(f"No spaCy model configured for {lang}")
-
-
-def get_nlp(lang: Lang) -> Language:
-    if lang not in _SPACY_CACHE:
-        _SPACY_CACHE[lang] = spacy.load(_model_name(lang))
-    return _SPACY_CACHE[lang]
-
-
 def extract_ner(lang: Lang, text: str) -> NerResult:
+    if not isinstance(lang, Lang):
+        raise TypeError(
+            f"extract_ner(lang, text) expected lang=Lang, got {type(lang)} value={lang!r}"
+        )
+
+
     nlp = get_nlp(lang)
     doc = nlp(text)
 

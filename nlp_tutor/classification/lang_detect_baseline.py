@@ -11,7 +11,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix
 
-from nlp_tutor.config import PATHS
+from nlp_tutor.config import PATHS, resolve_model_path
 from nlp_tutor.corpora import TextLabelDataset
 from nlp_tutor import preprocessing as prep
 
@@ -29,10 +29,6 @@ class TrainResult:
 
 
 def build_pipeline() -> Pipeline:
-    """
-    Character n-gram TF-IDF + Logistic Regression.
-    Strong baseline for language identification.
-    """
     vec = TfidfVectorizer(
         analyzer="char",
         ngram_range=(2, 5),
@@ -56,9 +52,6 @@ def predict_language_with_confidence(
     model: Pipeline | None = None,
     threshold: float = 0.70,
 ) -> Dict:
-    """
-    If confidence is low, return 'UNCERTAIN' instead of guessing.
-    """
     if model is None:
         model = load_model()
 
@@ -109,14 +102,8 @@ def train_eval_save(
     random_state: int = 42,
     save_path: Path | None = None,
 ) -> TrainResult:
-    """
-    Train + evaluate on any TextLabelDataset.
-    The dataset source (WiLI/Kaggle/custom) is handled elsewhere.
-    """
-
     ds = _filter_langs(ds, target_langs)
 
-    # Preprocess + truncate here (THIS is where [:50] belongs)
     X = [prep.normalise(t)[:max_chars] for t in ds.texts]
     y = [str(lbl) for lbl in ds.labels]
 
@@ -154,12 +141,20 @@ def train_eval_save(
 
 def load_model(path: Path | None = None) -> Pipeline:
     if path is None:
-        path = PATHS.models_dir / MODEL_NAME
+        path = resolve_model_path(MODEL_NAME)
     if not path.exists():
         raise FileNotFoundError(
             f"Language model not found at {path}. Train it first."
         )
     return joblib.load(path)
+
+
+def is_confident(top_k: List[Tuple[str, float]], gap_threshold: float = 0.2) -> bool:
+    if not top_k:
+        return False
+    if len(top_k) < 2:
+        return top_k[0][1] >= 0.5
+    return (top_k[0][1] - top_k[1][1]) >= gap_threshold
 
 
 def predict_language(text: str, model: Pipeline | None = None, top_k: int = 5) -> Dict:

@@ -5,10 +5,6 @@ from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Tuple
 
 
-# -------------------------
-# Lesson 5: Semantics
-# -------------------------
-
 class SemanticScoreRequest(BaseModel):
     lesson_id: int = Field(..., ge=1)
     item_id: int = Field(..., ge=1)
@@ -29,18 +25,12 @@ class SemanticScoreResponse(BaseModel):
     nearest: Dict[str, List[Tuple[str, float]]]
 
 
-# -------------------------
-# Lesson 6: Sentiment
-# -------------------------
-
 class SentimentRequest(BaseModel):
     text: str = Field(..., min_length=1)
 
 
 class SentimentResponse(BaseModel):
     label: str
-    # Keep as string for now because your predict_sentiment() may be returning str(probs).
-    # Later improvement: change to Optional[Dict[str, float]] and return a dict.
     probs: Optional[str] = None
 
 
@@ -76,3 +66,47 @@ class EntityOut(BaseModel):
 class NerResponse(BaseModel):
     entities: List[EntityOut]
     noun_phrases: List[str]
+
+
+class TutorEvaluateRequest(BaseModel):
+    lesson_id: int = Field(..., ge=1)
+    item_id: int = Field(..., ge=1)
+    learner_text: str = Field(..., min_length=1)
+    expected_lang: str = Field("ES", min_length=2)
+    allow_mixed: bool = False
+    prompt_en: Optional[str] = None
+    target_text: Optional[str] = None
+    gloss_en: Optional[str] = None
+
+
+class TutorAction(BaseModel):
+    code: str
+    message: str
+    severity: str
+
+class FluencyOut(BaseModel):
+    perplexity: float
+    band: str
+
+
+class TutorEvaluateResponse(BaseModel):
+    # lesson context
+    prompt_en: str
+    target_es: str
+    gloss_en: str
+    expected_lang: str
+
+    # NLP signals
+    detected_lang: str
+    detected_top_k: List["LabelScore"]
+
+    syntax_issues: List[Dict]
+    fluency: Optional["FluencyOut"] = None
+    ner: Dict
+    semantics: Dict[str, "SimilarityResultOut"]
+    nearest: Dict[str, List[Tuple[str, float]]]
+
+    # dialogue policy output
+    action: TutorAction
+
+

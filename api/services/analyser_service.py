@@ -42,8 +42,13 @@ def semantic_score(req: SemanticScoreRequest) -> SemanticScoreResponse:
 
     item = state.index[key]
 
-    scores = state.semantic_engine.score_answer(req.learner_es, item.target_es)
-    nearest = state.semantic_engine.nearest_targets(req.learner_es, k=5)
+    scores = state.semantic_engine.score_answer(req.learner_es, item.target_es, lang=Lang.ES)
+    nearest = state.semantic_engine.nearest_targets(req.learner_es, lang=Lang.ES, k=5)
+    if hasattr(state.semantic_engine, "nearest_targets_by_lang"):
+        try:
+            nearest["by_lang"] = state.semantic_engine.nearest_targets_by_lang(req.learner_es, k_per_lang=1)
+        except Exception:
+            pass
 
     scores_out: Dict[str, SimilarityResultOut] = {}
     for name, r in scores.items():
@@ -54,7 +59,7 @@ def semantic_score(req: SemanticScoreRequest) -> SemanticScoreResponse:
         )
 
     if hasattr(state.semantic_engine, "score_transformer"):
-        t_score = state.semantic_engine.score_transformer(req.learner_es, item.target_es)
+        t_score = state.semantic_engine.score_transformer(req.learner_es, item.target_es, lang=Lang.ES)
         scores_out["transformer_cosine"] = SimilarityResultOut(
             backend="transformer_cosine",
             score=float(t_score),
@@ -62,8 +67,7 @@ def semantic_score(req: SemanticScoreRequest) -> SemanticScoreResponse:
         )
 
     if hasattr(state.semantic_engine, "nearest_targets_transformer"):
-        t_nearest = state.semantic_engine.nearest_targets_transformer(req.learner_es, k=5)
-        # Add a new key to the nearest dict (keep existing nearest results intact)
+        t_nearest = state.semantic_engine.nearest_targets_transformer(req.learner_es, lang=Lang.ES, k=5)
         nearest["transformer_cosine"] = t_nearest
 
     return SemanticScoreResponse(
@@ -121,8 +125,8 @@ def language_detect(req: LanguageDetectRequest) -> LanguageDetectResponse:
 
 
 def ner_extract(req: NerRequest) -> NerResponse:
-    lang = Lang[req.lang.upper()]  # expects "EN"/"ES"
-    r = extract_ner(lang, req.text)
+    lang = Lang.parse(req.lang)
+    r = extract_ner(lang=lang, text=req.text)
     return NerResponse(
         entities=[EntityOut(**e.__dict__) for e in r.entities],
         noun_phrases=r.noun_phrases

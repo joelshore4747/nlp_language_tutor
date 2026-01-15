@@ -13,7 +13,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score, f1_score
 
 from ..corpora import load_imdb_kaggle
-from ..config import PATHS
+from ..config import PATHS, resolve_model_path
 from .. import preprocessing as prep
 
 
@@ -29,14 +29,9 @@ class TrainResult:
 
 
 def build_pipeline() -> Pipeline:
-    """
-    Strong classical baseline:
-    - TF-IDF with uni+bi-grams
-    - Logistic Regression (linear classifier)
-    """
     clf = LogisticRegression(
         max_iter=2000,
-        n_jobs=None,   # keep portable; some environments ignore n_jobs anyway
+        n_jobs=None,
         solver="lbfgs"
     )
 
@@ -64,7 +59,7 @@ def train_evaluate_save(
     ds = load_imdb_kaggle()
 
     X = [prep.normalise(t) for t in ds.texts]
-    y = [str(lbl) for lbl in ds.labels]  # 'positive'/'negative'
+    y = [str(lbl) for lbl in ds.labels]
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y
@@ -95,7 +90,7 @@ def train_evaluate_save(
 
 def load_model(path: Path | None = None) -> Pipeline:
     if path is None:
-        path = PATHS.models_dir / MODEL_NAME
+        path = resolve_model_path(MODEL_NAME)
     if not path.exists():
         raise FileNotFoundError(
             f"Model not found at {path}. Train it first:\n"
@@ -110,11 +105,9 @@ def predict_sentiment(text: str, model: Pipeline | None = None) -> Dict[str, str
 
     x = prep.normalise(text)
     pred = model.predict([x])[0]
-    # optional: probability if supported
     out = {"label": str(pred)}
     if hasattr(model, "predict_proba"):
         proba = model.predict_proba([x])[0]
-        # pipeline clf classes
         classes = list(model.named_steps["clf"].classes_)
         probs = {classes[i]: float(proba[i]) for i in range(len(classes))}
         out["probs"] = str(probs)

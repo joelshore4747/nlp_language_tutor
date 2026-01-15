@@ -43,17 +43,17 @@ def sentence_segment(text: str, lang: Lang = Lang.EN) -> List[str]:
     return sent_tokenize(text)
 
 
-def tokenize(text: str, lang: Lang = Lang.EN, lemmatise: bool = True) -> List[str]:
+def tokenize(text: str, lang: Lang = Lang.EN, lemmatize: bool = True) -> List[str]:
     """
-    Tokenise text; lemmatise for English (WordNet), skip for Spanish for now.
+    Tokenise text; lemmatize for English (WordNet), skip for Spanish for now.
 
-    Why skip ES lemmatisation?
-    - NLTK WordNet lemmatiser is English-focused.
+    Why skip ES lemmatization?
+    - NLTK WordNet lemmatizer is English-focused.
     - We keep tokenisation consistent and document this limitation.
     """
     tokens = word_tokenize(text)
 
-    if not lemmatise:
+    if not lemmatize:
         return tokens
 
     lemmas: List[str] = []
@@ -72,9 +72,9 @@ def tokenize(text: str, lang: Lang = Lang.EN, lemmatise: bool = True) -> List[st
     return lemmas
 
 
-def tokenize_sentences(text: str, lang: Lang = Lang.EN, lemmatise: bool = True) -> List[List[str]]:
+def tokenize_sentences(text: str, lang: Lang = Lang.EN, lemmatize: bool = True) -> List[List[str]]:
     sents = sentence_segment(text, lang=lang)
-    return [tokenize(s, lang=lang, lemmatise=lemmatise) for s in sents]
+    return [tokenize(s, lang=lang, lemmatize=lemmatize) for s in sents]
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +98,7 @@ def type_token_ratio(tokens: Iterable[str]) -> float:
 
 def compute_stats(text: str, lang: Lang = Lang.EN) -> TextStats:
     sents = sentence_segment(text, lang=lang)
-    tokenised = [tokenize(s, lang=lang, lemmatise=True) for s in sents]
+    tokenised = [tokenize(s, lang=lang, lemmatize=True) for s in sents]
     all_tokens = [t for sent in tokenised for t in sent if _word_pattern.fullmatch(t)]
 
     if not tokenised:
