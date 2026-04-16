@@ -7,7 +7,7 @@ if __name__ == "__main__":
     r = train_eval_save(
         ds=ds,
         target_langs={"English", "Spanish", "Polish"},
-        max_chars=120,      # give the LSTM enough sequence
+        max_chars=120,
         epochs=6,
         batch_size=64,
         lr=2e-3,

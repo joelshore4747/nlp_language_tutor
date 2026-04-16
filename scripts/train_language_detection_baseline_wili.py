@@ -8,7 +8,7 @@ if __name__ == "__main__":
     r = train_eval_save(
         ds=ds,
         target_langs={"English", "Spanish", "Polish"},
-        max_chars=50,  # realistic “short message” setting
+        max_chars=50,
     )
 
     print(f"\nAccuracy: {r.accuracy:.4f}")

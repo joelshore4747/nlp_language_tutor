@@ -10,9 +10,9 @@ from transformers import AutoModel, AutoTokenizer
 
 def _mean_pool(last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
 
-    mask = attention_mask.unsqueeze(-1).type_as(last_hidden_state)  # (B, T, 1)
-    summed = (last_hidden_state * mask).sum(dim=1)                  # (B, H)
-    counts = mask.sum(dim=1).clamp(min=1e-9)                        # (B, 1)
+    mask = attention_mask.unsqueeze(-1).type_as(last_hidden_state)
+    summed = (last_hidden_state * mask).sum(dim=1)
+    counts = mask.sum(dim=1).clamp(min=1e-9)
     return summed / counts
 
 

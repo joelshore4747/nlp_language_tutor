@@ -4,7 +4,6 @@ from nlp_tutor.ngram_model import NgramLanguageModel, NgramLMConfig
 def test_perplexity_direction_better_order_lower():
     lm = NgramLanguageModel(NgramLMConfig(order=2, add_k=1.0))
 
-    # Train a tiny LM where this order is common
     corpus = []
     for _ in range(80):
         corpus.append(["i", "like", "apples"])

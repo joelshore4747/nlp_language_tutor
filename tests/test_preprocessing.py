@@ -1,5 +1,4 @@
 def test_tutor_response_schema_accepts_fluency_object():
-    # Import inside test so it fails loudly if schema isn't updated
     from api.schemas import TutorEvaluateResponse, TutorAction, LabelScore, SimilarityResultOut, FluencyOut
 
     resp = TutorEvaluateResponse(

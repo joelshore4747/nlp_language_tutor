@@ -1,5 +1,5 @@
 # CMU657 Natural Language Processing — Project  
-**LinguaTrail: An Adaptive NLP Tutor Pipeline (Language ID, Semantics, Syntax, NER, Fluency)**  
+**Language Application: An Adaptive NLP Tutor Pipeline (Language ID, Semantics, Syntax, NER, Fluency)**  
 
 **Author:** Joel Shore  
 **Module:** CMU657 Natural Language Processing  
@@ -11,7 +11,7 @@
 
 The project is a compact NLP tutoring system designed to give language learners fast, structured feedback on short translation or comprehension answers. My main goal wasn’t to build another “right or wrong” quiz, but something that felt closer to a real tutor, a system that could tell what the learner meant, not just whether they used the exact same words at least this was the idea.  
 
-To do this, I built a pipeline combining five key NLP components: **language identification**, **semantic similarity**, **syntax heuristics**, **named entity recognition (NER)**, and **fluency scoring**. Each one provides a specific signal about the learner’s response. Together, they form an explainable tutor system that can return clear outcomes like **GOOD**, **RETRY**, or **LANGUAGE MISMATCH**.  
+To do this, I built a pipeline combining five key NLP components: **language identification**, **semantic similarity**, **syntax heuristics**, **named entity recognition (NER)**, and **fluency scoring**. Each component contributes a distinct linguistic signal, enabling a structured and interpretable decision process. about the learner’s response. Together, they form an explainable tutor system that can return clear outcomes like **GOOD**, **RETRY**, or **LANGUAGE MISMATCH**.  
 
 The project uses a **FastAPI backend** to run the tutor logic and a **SolidJS frontend** inspired by Duolingo to make it more interactive. While it’s not a full conversational LLM tutor, it demonstrates how classical and neural NLP methods can work together to create a meaningful, interpretable learning tool.  
 
@@ -125,24 +125,70 @@ All of these components feed into a final decision function called **choose acti
 
 This policy ensures predictable, consistent behaviour — something most AI tutors lack.  
 
+### 4.8 Model Selection and Justification  
+
+The most important design choice in the project is that LinguaTrail is a **hybrid system** rather than a single end to end neural model. That decision was deliberate. I used **classical models** where interpretability and low latency were most important, and **transformer based semantics** only where lexical matching was too brittle.  
+
+- **TF IDF + Logistic Regression** was chosen for language ID because short learner responses carry strong character level language cues, and the model is both fast and easy to inspect. A fine tuned BERT classifier was considered, but it would have increased compute cost and reduced explainability without solving the main challenge in the tutor.  
+- **TF IDF + multilingual transformer similarity** was used for semantics because the tutor needs both conservative grading and some ability to recognise paraphrase. TF IDF gives transparent lexical evidence; transformer embeddings provide semantic flexibility when wording changes.  
+- **Rule based syntax checks on top of spaCy parsing** were used instead of full grammar scoring because the project only needs targeted learner feedback such as “missing verb” or “fragment”, not a full grammaticality estimate.  
+- **N gram fluency scoring** was selected because it is cheap, deterministic, and easy to calibrate into broad bands. A neural language model would be more expressive, but much less explainable.  
+
+This justification matters because it explains the system as a set of deliberate engineering trade offs: **explainability vs flexibility**, **speed vs model complexity**, and **repeatability vs open ended generation**. A fuller critique is provided in `reports/sections/01_model_selection_and_justification.md`.  
+
 ---
 
 ## 5. Evaluation  
 
 ### Language identification  
 
-Language identification was evaluated using 1,500 WiLI samples (500 per language).  
+Language identification was evaluated on 1,500 held out WiLI samples (500 English, 500 Spanish, 500 Polish) using the packaged baseline model actually deployed in the tutor.  
 
-- TF IDF model: **0.9927 accuracy**  
-- BiLSTM model: **0.9440 accuracy**  
+- Baseline char TF IDF + Logistic Regression: **0.9860 accuracy**, **0.9860 macro F1**  
 
-This supports an important takeaway: for short text language ID, strong classical baselines can be extremely competitive.  
+The confusion matrix was:
+
+| True \ Pred | English | Polish | Spanish |
+|----------|---------:|--------:|---------:|
+| English | 497 | 2 | 1 |
+| Polish | 5 | 493 | 2 |
+| Spanish | 6 | 5 | 489 |
+
+This supports an important takeaway: for short text language ID, strong classical baselines can be extremely competitive. The screenshot figures from the evaluation notebook are referenced as **Figure A4** (`confusion_matrix.png`) and **Figure A5** (`precision_recall_f1.png`).  
 
 ### Semantic similarity  
 
-Semantic similarity was tested using lesson bank sentences against random negatives. Both TF IDF and transformer embeddings separated positives and negatives clearly, showing the pipeline logic works, although real paraphrase coverage is still limited by lesson bank scope.  
+Semantic similarity was expanded into a small threshold study covering exact matches, paraphrases, partial answers, and wrong answers. The strongest pattern was that **TF IDF is conservative**, while the transformer is **more paraphrase aware but more willing to over score partial answers**. On the semantic benchmark:
 
-A supporting Jupyter notebook demonstrates predictions, nearest neighbour retrieval, syntax and NER examples, and policy execution in a reproducible way.  
+| Label | Mean TF IDF | Mean transformer |
+|----------|------------:|-----------------:|
+| match | 0.5579 | 0.8897 |
+| partial | 0.4421 | 0.8275 |
+| mismatch | 0.0455 | 0.2314 |
+
+This result justifies the hybrid design. TF IDF protects against false positives, but it misses some valid rewordings. Transformer similarity recovers those cases, but it can also make incomplete answers look too acceptable if used on its own. The notebook screenshot for this comparison is referenced as **Figure A6** (`semantic_threshold.png`).  
+
+### Ablation and failure analysis  
+
+I also added a small functional benchmark for the full tutor policy. On an 8 case action benchmark, the **full system** matched the intended tutor action on **8/8 cases**, while **removing syntax** dropped to **6/8** and **removing fluency** dropped to **7/8**. This shows that the extra components are not decorative; they change decisions in meaningful ways. The ablation screenshot is referenced as **Figure A7** (`Tutor_ablation_results.png`).  
+
+The failure analysis was equally important. Five examples showed the current limits clearly:
+
+- accent free Spanish questions can trigger false syntax errors  
+- near exact answers can fall below the current TF IDF policy threshold  
+- short but plausible answers can be blocked by the minimum length gate  
+- some exact lesson targets are still parser sensitive  
+- lexical paraphrases such as acronym expansion remain under served  
+
+These failure patterns are illustrated by **Figure A8** (`tutor_failure_case.png`).  
+
+Supporting material is now split across:
+
+- `reports/sections/02_evaluation_and_failure_analysis.md`
+- `reports/analysis/`
+- `reports/notebooks/01_nlp_models_analysis.ipynb`
+- `reports/notebooks/02_language_id_evaluation_report.ipynb`
+- `reports/notebooks/03_tutor_pipeline_evaluation_report.ipynb`
 
 ---
 
@@ -150,14 +196,14 @@ A supporting Jupyter notebook demonstrates predictions, nearest neighbour retrie
 
 The main strength of LinguaTrail is that it feels like a real tutor system rather than a single model demo. It integrates multiple NLP skills, separates backend logic from UI, and gives feedback that can be explained.  
 
-The key limitation is scope: the lesson bank is small, semantic evaluation is most reliable for near exact matches, and fluency signals can degrade on very short or mixed language text.  
+The expanded evaluation also makes the limitations clearer. The lesson bank is still small and handcrafted, so coverage is narrow. TF IDF based grading is robust against obvious mismatches, but can be too strict for valid paraphrases. Transformer similarity is more flexible, but can over accept partial answers. Syntax rules are useful for fragments, yet brittle when accents are removed or parsing becomes unstable. Fluency scoring helps produce a more tutor like response, but it should be treated as a heuristic rather than a true proficiency score.  
 
 If I continued the project, the biggest improvements would be:  
 
 - Expanding the lesson bank with paraphrases and learner error patterns  
 - Calibrating thresholds using real learner data  
 - Training stronger per language fluency models  
-- Exploring controlled fine tuning of transformer embeddings  
+- Exploring controlled fine tuning or calibration of transformer similarity  
 - Extending the interface to voice input so learners can speak answers naturally  
 
 ---
@@ -181,11 +227,32 @@ Example evaluation showing LANGUAGE MISMATCH when the detected language differs 
 **Figure A3 — ui success good.png**  
 Successful evaluation returning GOOD with semantic scores, syntax status, fluency output and entity extraction.  
 
+**Figure A4 — confusion_matrix.png**  
+Language identification confusion matrix from the evaluation notebook, showing a strong diagonal and limited cross language confusion on the EN/ES/PL WiLI subset.  
+
+**Figure A5 — precision_recall_f1.png**  
+Per language precision, recall, and F1 summary for the deployed baseline language identifier.  
+
+**Figure A6 — semantic_threshold.png**  
+Semantic threshold comparison showing how TF IDF and transformer similarity behave across matches, partial answers, and mismatches.  
+
+**Figure A7 — Tutor_ablation_results.png**  
+Ablation summary comparing the full tutor policy against variants without syntax or fluency signals.  
+
+**Figure A8 — tutor_failure_case.png**  
+Failure case screenshot highlighting where the current tutor still misclassifies or over penalises valid learner input.  
+
 ---
 
 ## Appendix B — Notebook Summary (NLP Models and Functions Analysis)  
 
-The notebook includes lightweight reproducible checks for the tutor pipeline and runs entirely without raw datasets. It validates that the packaged models and lesson resources operate correctly, and that the tutor pipeline produces stable outputs even when optional dependencies are missing.  
+Three notebooks now support the report:
+
+- `01_nlp_models_analysis.ipynb` — lightweight checks of the packaged tutor components  
+- `02_language_id_evaluation_report.ipynb` — confusion matrix and per language precision/recall views  
+- `03_tutor_pipeline_evaluation_report.ipynb` — semantic threshold tables, ablation results, and failure cases  
+
+Together they provide screenshot ready views of the data behind the written report sections.  
 
 ---
 
@@ -193,7 +260,9 @@ The notebook includes lightweight reproducible checks for the tutor pipeline and
 
 Thoma, M. (2018) WiLI 2018: Wikipedia Language Identification dataset. Available at: https://zenodo.org/records/840106 (Accessed: 16 December 2025).  
 
-Maas, A.L., Daly, R.E., Pham, P.T., Huang, D., Ng, A.Y. and Potts, C. (2011) Learning word vectors for sentiment analysis. Available at: https://www.kaggle.com/datasets/lakshmi25npathi/imdb-dataset-of-50k-movie-reviews (Accessed: 16 December 2025).  
+Mexwell (n.d.) WiLI-2018 Dataset. Kaggle. Available at: https://www.kaggle.com/datasets/mexwell/wili-2018 (Accessed: 2 February 2026).  
+
+Lakshmipathi, N. (2019) IMDB Dataset of 50K Movie Reviews. Kaggle. Available at: https://www.kaggle.com/datasets/lakshmi25npathi/imdb-dataset-of-50k-movie-reviews (Accessed: 2 February 2026).  
 
 Reimers, N. and Gurevych, I. (2019) ‘Sentence BERT: Sentence embeddings using Siamese BERT networks’, arXiv. Available at: https://arxiv.org/abs/1908.10084 (Accessed: 16 December 2025).  
 

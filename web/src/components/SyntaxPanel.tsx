@@ -5,7 +5,6 @@ export function SyntaxPanel(props: { issues: any[] }) {
     if (typeof i === "string") return i;
     if (!i || typeof i !== "object") return String(i);
 
-    // common keys we might see
     const msg =
       i.message ??
       i.msg ??

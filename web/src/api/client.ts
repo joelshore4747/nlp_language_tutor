@@ -13,7 +13,6 @@ export async function postSemanticScore(
   });
 
   if (!res.ok) {
-    // show useful backend error message
     const text = await res.text();
     throw new Error(text || `HTTP ${res.status}`);
   }

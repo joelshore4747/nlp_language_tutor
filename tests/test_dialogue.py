@@ -7,8 +7,8 @@ def test_fluency_is_soft_nudge_not_block():
         detected_lang="ES",
         lang_conf_ok=True,
         syntax_issues=[],
-        semantic_score=0.9,     # good semantics
-        fluency_band="low",     # low fluency should nudge
+        semantic_score=0.9,
+        fluency_band="low",
     )
     assert action.code == "FLUENCY_NUDGE"
     assert action.severity == "info"

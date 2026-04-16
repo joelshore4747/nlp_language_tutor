@@ -4,7 +4,6 @@ from nlp_tutor.classification.lang_detect_baseline import build_pipeline, predic
 def test_language_detect_baseline_output_shape():
     model = build_pipeline()
 
-    # build_pipeline() uses TF-IDF with min_df=2, so duplicate examples
     X = [
         "Hola amigo", "Hola amigo",
         "Hello friend", "Hello friend",

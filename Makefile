@@ -2,12 +2,34 @@ PYTHON := .venv/bin/python
 PIP := .venv/bin/pip
 UVICORN := .venv/bin/uvicorn
 PYTEST := .venv/bin/pytest
+MAKEFLAGS += --no-print-directory
 
-.PHONY: setup api web web-install test docs submission train-lang-baseline train-lang-bilstm train-sentiment-baseline train-sentiment-bilstm
+.DEFAULT_GOAL := help
+
+.PHONY: help all setup api web web-install dev test train-lang-baseline train-lang-bilstm train-sentiment-baseline train-sentiment-bilstm
+
+help:
+	@printf "Available targets:\n"
+	@printf "  make all                      Run the API and web app together\n"
+	@printf "  make setup                    Create .venv and install Python dependencies\n"
+	@printf "  make dev                      Run the API and web app together\n"
+	@printf "  make api                      Run the FastAPI backend\n"
+	@printf "  make web-install              Install web dependencies with npm\n"
+	@printf "  make web                      Run the web app in dev mode\n"
+	@printf "  make test                     Run the test suite\n"
+	@printf "  make train-lang-baseline      Train the baseline language detection model\n"
+	@printf "  make train-lang-bilstm        Train the BiLSTM language detection model\n"
+	@printf "  make train-sentiment-baseline Train the baseline sentiment model\n"
+	@printf "  make train-sentiment-bilstm   Train the BiLSTM sentiment model\n"
+
+all: dev
 
 setup:
 	python3 -m venv .venv
 	$(PIP) install -r requirements.txt
+
+dev:
+	$(MAKE) -j2 api web
 
 api:
 	$(UVICORN) api.main:app --reload
@@ -20,12 +42,6 @@ web:
 
 test:
 	$(PYTEST) -q
-
-docs:
-	$(PYTHON) scripts/build_docs.py
-
-submission:
-	$(PYTHON) scripts/build_submission_bundle.py
 
 train-lang-baseline:
 	$(PYTHON) scripts/train_language_detection_baseline_wili.py

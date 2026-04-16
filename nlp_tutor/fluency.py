@@ -59,11 +59,9 @@ class FluencyScorer:
         q_medium: float = 0.80,
         lemmatize: bool = False,
         debug: bool = False,
-        # token cleanup knobs
         drop_artefacts: bool = True,
         drop_underscore_tokens: bool = True,
         drop_numeric_tokens: bool = True,
-        # calibration knobs
         min_lesson_calib_sents: int = 10,
     ) -> None:
         if not (0.0 < q_high < 1.0) or not (0.0 < q_medium < 1.0):
@@ -87,10 +85,6 @@ class FluencyScorer:
         self.drop_numeric_tokens = drop_numeric_tokens
 
         self.min_lesson_calib_sents = min_lesson_calib_sents
-
-    # -------------------------
-    # Public helpers (testing)
-    # -------------------------
 
     def train_from_tokenized(
         self,
@@ -122,7 +116,7 @@ class FluencyScorer:
         if lang in self.models:
             return
 
-        raw_corpus = load_lm_corpus(lang)  # List[List[str]] from NLTK sources
+        raw_corpus = load_lm_corpus(lang)
         if not raw_corpus:
 
             self.thresholds[lang] = (150.0, 300.0)
@@ -241,7 +235,6 @@ class FluencyScorer:
         high = float(np.quantile(ppls, self.q_high))
         medium = float(np.quantile(ppls, self.q_medium))
 
-        # Safety: ensure ordering + non-trivial separation
         if medium <= high:
             medium = high * 1.25
 
@@ -261,7 +254,6 @@ class FluencyScorer:
         except Exception:
             return []
 
-        # IMPORTANT: bank is already an iterable (likely a list)
         items = bank
 
         texts: List[str] = []

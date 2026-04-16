@@ -108,7 +108,6 @@ class SemanticScorer:
                 "Install with: python -m pip install sentence-transformers"
             ) from e
 
-        # multilingual, good for EN/ES (and many more)
         self._sbert_model = SentenceTransformer(
             "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
         )

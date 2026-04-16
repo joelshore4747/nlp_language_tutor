@@ -134,15 +134,16 @@ The bundle is written to `dist/nlp-adaptive-tutor-submission.zip`.
 ## Docs and Reports
 - Project report: `reports/Project_Report.md` and `reports/Project_Report.pdf`
 - Analysis notebook (single): `reports/notebooks/01_nlp_models_analysis.ipynb`
+- Data guide: `data/README.md`
 
 ## Makefile Shortcuts
 ```bash
 make setup
+make all
+make dev
 make api
 make web
 make test
-make docs
-make submission
 ```
 
 ## Notes
