@@ -1,157 +1,163 @@
 # NLP Adaptive Tutor
 
-A compact NLP tutoring system that evaluates short learner responses with language ID, syntax checks, semantic similarity, NER, and fluency scoring. It exposes a FastAPI backend and a small Solid.js web UI.
+A small language-learning tutor that checks a learner's short answer (English, Spanish or Polish) against a lesson target. Its feedback is more specific than right or wrong. It runs five classical and neural NLP checks:
 
-## Features
-- Unified pipeline: language detection, syntax checks, semantics, NER, fluency, and policy gating.
-- Two language ID models: char TF-IDF baseline and char BiLSTM.
-- Semantic scoring: TF-IDF cosine plus transformer embeddings.
-- API endpoints for tutoring and semantic scoring.
-- Web UI for interactive feedback panels.
+- language identification
+- semantic similarity
+- syntax heuristics
+- named entity recognition (NER)
+- n-gram fluency
 
-## Repo Layout
-- `api/`: FastAPI app and routes.
-- `nlp_tutor/`: core NLP pipeline and models.
-- `nlp_tutor/resources/`: packaged lesson bank and baseline models.
-- `data/`: datasets, models, and lesson bank.
-- `scripts/`: training and helper scripts.
-- `tests/`: unit tests.
-- `web/`: Solid.js frontend.
-- `reports/`: project report plus a single analysis notebook at `reports/notebooks/01_nlp_models_analysis.ipynb`.
+A rule-based policy turns those signals into one action: `GOOD`, `LANGUAGE_MISMATCH`, `SYNTAX_FIX`, `MEANING_MISMATCH` or `FLUENCY_NUDGE`. A FastAPI backend serves it, and a SolidJS front end ("LinguaTrail") shows every signal next to the verdict, so the learner can see why an answer was marked the way it was.
 
-## Setup
+This was the project for a university NLP module (CMU657, December 2025). The write-up is in [`reports/Project_Report.md`](reports/Project_Report.md).
 
-### Python
+<p>
+  <img src="reports/images/ui_language_good.png" alt="Tutor marking an English answer GOOD, with language, semantic, syntax, fluency and NER panels" width="49%">
+  <img src="reports/images/ui_language_mismatch.png" alt="Tutor flagging LANGUAGE_MISMATCH when a Spanish lesson gets an English answer" width="49%">
+</p>
+
+## How it works
+
+```mermaid
+flowchart LR
+    UI[SolidJS web UI<br/>lesson path + feedback panels] -->|POST /tutor/evaluate| API[FastAPI]
+    API --> P[TutorPipeline]
+    P --> L[Language ID<br/>char TF-IDF + logistic regression<br/>or char BiLSTM if present]
+    P --> S[Syntax heuristics<br/>spaCy POS + dependency parse]
+    P --> M[Semantic similarity<br/>TF-IDF cosine +<br/>multilingual MiniLM embeddings]
+    P --> F[Fluency<br/>bigram LM perplexity<br/>NLTK Brown / CESS-ESP]
+    P --> N[NER + noun phrases<br/>spaCy]
+    L & S & M & F --> D{Dialogue policy}
+    D --> R[Action + message<br/>+ every signal as JSON]
+    N --> R
+    R --> UI
+    LB[(lesson_bank.csv<br/>prompts + ES/EN/PL targets)] --> M
+```
+
+The policy in [`nlp_tutor/dialogue_policy.py`](nlp_tutor/dialogue_policy.py) checks the signals in a fixed order:
+
+1. Wrong language → `LANGUAGE_MISMATCH`
+2. Low confidence about the language → `LANGUAGE_UNCERTAIN`
+3. Syntax problems, such as a missing main verb or a noun-heavy fragment → `SYNTAX_FIX`
+4. Semantic score below 0.80 → `MEANING_MISMATCH`
+5. Low fluency → `FLUENCY_NUDGE`, which is a soft hint rather than a block
+6. Otherwise → `GOOD`
+
+Answers shorter than three words are rejected up front with `INPUT_TOO_SHORT`.
+
+Components:
+
+| Area | Implementation |
+|---|---|
+| Language ID | Character TF-IDF + logistic regression ([`lang_detect_baseline.py`](nlp_tutor/classification/lang_detect_baseline.py)), trained on WiLI-2018 (EN/ES/PL). A character-level BiLSTM in PyTorch ([`lang_detect_bilstm_chars.py`](nlp_tutor/classification/lang_detect_bilstm_chars.py)) is used instead when its weights are present. |
+| Semantics | TF-IDF cosine against the lesson targets, plus mean-pooled `paraphrase-multilingual-MiniLM-L12-v2` embeddings via Hugging Face `transformers`. Also returns the nearest lesson targets. |
+| Syntax | spaCy `*_core_*_sm` models: POS counts, root, and rule-based issue codes. |
+| Fluency | Hand-written bigram language model with add-k smoothing ([`ngram_model.py`](nlp_tutor/ngram_model.py)). Perplexity bands are calibrated on the lesson bank. |
+| NER | spaCy entities and noun chunks. |
+| Extras | Sentiment baselines on IMDB (TF-IDF and BiLSTM). These are training scripts only and are not part of the tutor. |
+
+## Results
+
+**Language identification.** I re-ran this on 29 October 2026: the committed TF-IDF + logistic regression model ([`nlp_tutor/resources/models/`](nlp_tutor/resources/models)) on the full WiLI-2018 test split for English, Spanish and Polish (500 paragraphs each, N = 1,500):
+
+| Input given to the model | Accuracy | Macro F1 |
+|---|---|---|
+| Full paragraph | 0.9927 | 0.9927 |
+| First 50 characters (the training setting) | 0.9860 | 0.9860 |
+| First 20 characters | 0.9580 | 0.9581 |
+
+Accuracy drops as the text gets shorter, and the errors are mostly Spanish or Polish predicted as English. Tutor answers are short, which is why the policy has a low-confidence path. An earlier run gave 0.9440 accuracy for the char BiLSTM on the same 1,500 paragraphs. Its weights (`data/models/*.pt`) are git-ignored, so that figure could not be re-checked from this repo.
+
+**Tutor policy.** On a hand-built set of 8 cases, one per expected action, the full pipeline chose the expected action in 8 of 8. Without the syntax check it got 6 of 8, and without the fluency check 7 of 8 ([notebook 03](reports/notebooks/03_tutor_pipeline_evaluation_report.ipynb)). The set is tiny. It shows that each component changes the outcome, not how accurate the tutor is overall.
+
+Further figures, including the confusion matrix, per-class precision, recall and F1, the semantic threshold and a failure case, are in [`reports/images/`](reports/images) and discussed in [`reports/sections/`](reports/sections).
+
+**Tests.** 5 unit tests: the language-ID pipeline shape, the dialogue policy, n-gram perplexity ordering, and the API response schema. Result: `pytest -q` → **5 passed** (Python 3.11, re-run 29 October 2026).
+
+## Running it
+
+Requires Python 3.11+. Node or Bun is needed for the web UI.
+
 ```bash
 python3 -m venv .venv
-. .venv/bin/activate
-pip install -r requirements.txt
+source .venv/bin/activate
+pip install -r requirements.txt     # includes the three spaCy models and torch
+pytest -q
+uvicorn api.main:app --reload       # API on http://127.0.0.1:8000
 ```
 
-### spaCy Models
-The required spaCy models are pinned in `requirements.txt`. If they do not install, run:
-```bash
-python -m spacy download en_core_web_sm
-python -m spacy download es_core_news_sm
-python -m spacy download pl_core_news_sm
-```
-
-### Web
 ```bash
 cd web
-bun install
-or 
 npm install
+npm run dev                         # UI on http://localhost:5173
 ```
 
-## Run
+The UI reads `VITE_API_BASE` from `web/.env`. `make dev` runs the API and the UI together. The first request downloads the MiniLM model from Hugging Face, and NLTK corpora are downloaded on first use.
+
+**Known gaps in a fresh clone:**
+
+- `lesson_bank.csv` is not committed, because `.gitignore` excludes `*.csv`. `/health` works, but `/tutor/evaluate` and `/semantic/score` return HTTP 500 until a lesson bank exists. The expected location is `nlp_tutor/resources/lesson_bank.csv`, or set `NLP_TUTOR_LESSON_BANK=/path/to/lesson_bank.csv`. The columns are `lesson_id, item_id, topic, prompt_en, target_es, target_en, target_pl, gloss_en`.
+- `npm run build` currently fails TypeScript checks (2 type errors). `npm run dev` still works.
+- `requirements.txt` pins CUDA builds of PyTorch. On a CPU-only machine, install `torch` from the CPU wheel index instead.
+- Polish fluency needs a local corpus at `nlp_tutor/resources/lm/pl.txt` (one sentence per line) or `NLP_TUTOR_LM_PL`.
 
 ### API
-```bash
-. .venv/bin/activate
-uvicorn api.main:app --reload
-```
 
-### Web UI
-```bash
-cd web
-bun dev
-or
-npm run dev
-```
-
-The web app reads `VITE_API_BASE` from `web/.env`.
-
-## API Endpoints
-
-### Health
 `GET /health`
 
-### Tutor Evaluate
 `POST /tutor/evaluate`
+
 ```json
 {
   "lesson_id": 1,
   "item_id": 1,
-  "learner_text": "Me llamo Joel y estudio informatica.",
+  "learner_text": "Estudio NLP en la universidad hoy.",
   "expected_lang": "ES",
   "allow_mixed": false
 }
 ```
 
-### Semantic Score
-`POST /semantic/score`
-```json
-{
-  "lesson_id": 1,
-  "item_id": 1,
-  "learner_es": "Me llamo Joel y estudio informatica."
-}
-```
+Returns the action code and message, detected language with top-k scores, syntax issues, semantic scores and nearest targets, the fluency band and perplexity, and named entities.
 
-## Results Summary (Sample Evaluations)
+`POST /semantic/score` returns similarity scores only.
 
-### Language Detection (WiLI 2018 test sample)
-- Setup: 500 samples per class (EN, ES, PL), total N=1500.
-- Baseline (char TF-IDF + logreg): Accuracy 0.9927, Macro F1 0.9927.
-- Char BiLSTM: Accuracy 0.9440, Macro F1 0.9437.
+### Training scripts
 
-### Semantic Similarity (lesson bank sanity check)
-- Setup: exact target vs random negative target (12 items).
-- TF-IDF: mean positive 1.0000, mean negative 0.0133, pairwise accuracy 1.00.
-- Transformer: mean positive 1.0000, mean negative 0.2634, pairwise accuracy 1.00.
-
-Full write-up is in `reports/Project_Report.pdf`, with supporting analysis in `reports/notebooks/01_nlp_models_analysis.ipynb`.
-
-## Training
-
-### Language Detection
 ```bash
+python data/wiLi_2018.py                               # download WiLI-2018 via kagglehub
 python scripts/train_language_detection_baseline_wili.py
 python scripts/train_language_detection_bilstm_wili.py
-```
-
-### Sentiment (optional)
-```bash
-python scripts/train_sentiment_baseline.py
+python scripts/train_sentiment_baseline.py             # optional, IMDB
 python scripts/train_sentiment_bilstm.py
 ```
 
-## Tests
-```bash
-. .venv/bin/activate
-pytest -q
+## Repository layout
+
+```
+api/            FastAPI app, routers, Pydantic schemas, cached app state
+nlp_tutor/      pipeline, policy, classifiers, semantics, syntax, fluency, NER
+nlp_tutor/resources/   committed language-ID model; optional LM corpora
+scripts/        training and helper scripts
+tests/          pytest unit tests
+web/            SolidJS + Vite front end
+reports/        project report, sections, evaluation notebooks, figures
 ```
 
-## Submission Bundle (No Raw Datasets)
-This project runs without the raw training datasets. Only the lesson bank and pretrained models are required.
-To build a submission zip that excludes `data/raw`:
-```bash
-python scripts/build_submission_bundle.py
-```
-The bundle is written to `dist/nlp-adaptive-tutor-submission.zip`.
+## Data and licences
 
-## Docs and Reports
-- Project report: `reports/Project_Report.md` and `reports/Project_Report.pdf`
-- Analysis notebook (single): `reports/notebooks/01_nlp_models_analysis.ipynb`
-- Data guide: `data/README.md`
+- **WiLI-2018** (Thoma, 2018; [Zenodo 841984](https://doi.org/10.5281/zenodo.841984)), used for language ID. It is listed under the Open Database License (ODbL 1.0). It is downloaded through Kaggle (`mexwell/wili-2018`) and not committed. The committed language-ID model is trained on it.
+- **IMDB 50K reviews** (the Kaggle copy of Maas et al., 2011), used for the optional sentiment experiments. It is downloaded by script and not committed.
+- **NLTK Brown and CESS-ESP corpora**, used for fluency. They are fetched at runtime through `nltk.download` and carry their own NLTK data licences.
+- **The lesson bank** is handwritten and not yet in the repo.
 
-## Makefile Shortcuts
-```bash
-make setup
-make all
-make dev
-make api
-make web
-make test
-```
+## What I'd do next
 
-## Notes
-- Transformer models download on first use.
-- The lesson bank is small and intended for demonstration and class exercises.
-- Raw datasets under `data/raw` are only used for training scripts and are not required to run the API or UI.
-- Override paths if needed:
-  - `NLP_TUTOR_LESSON_BANK=/path/to/lesson_bank.csv`
-  - `NLP_TUTOR_MODELS_DIR=/path/to/models`
-  - `NLP_TUTOR_LM_PL=/path/to/polish_corpus.txt`
-- For Polish fluency, add `nlp_tutor/resources/lm/pl.txt` (one sentence per line) or set `NLP_TUTOR_LM_PL`.
+- Commit the lesson bank, so the API works straight after cloning.
+- Swap the bigram fluency model for a trigram model or a small pretrained language model. Perplexity on 6–7-word answers is noisy, as the very high values in the screenshots show.
+- Build a larger labelled set of learner answers, so the policy thresholds (such as the 0.80 semantic cut-off) can be tuned rather than set by hand.
+- Fix the TypeScript build errors and add API-level tests.
+
+---
+
+This README was written with [Claude Code](https://claude.com/claude-code) from the code, with the tests and the language-ID evaluation re-run.
